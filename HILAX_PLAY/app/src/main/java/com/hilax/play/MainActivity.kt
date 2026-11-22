@@ -3,6 +3,7 @@ package com.hilax.play
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -101,7 +102,8 @@ class MainActivity : ComponentActivity() {
             setTextColor(white)
             setHintTextColor(Color.GRAY)
             textSize = 14f
-            singleLine = true
+            maxLines = 1
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setPadding(14, 12, 14, 12)
             setBackgroundColor(panel)
         }
@@ -134,6 +136,9 @@ class MainActivity : ComponentActivity() {
                 topMargin = 12
             }
         )
+
+        header.addView(status)
+
         videoContainer = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
         }
@@ -268,6 +273,7 @@ class MainActivity : ComponentActivity() {
 
         val params =
             videoContainer.layoutParams as LinearLayout.LayoutParams
+
         params.height = 0
         params.weight = 1f
         videoContainer.layoutParams = params
@@ -303,5 +309,3 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
-
-        header.addView(status)

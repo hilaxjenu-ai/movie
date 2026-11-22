@@ -109,8 +109,8 @@ class MainActivity : ComponentActivity() {
         val playButton = Button(this).apply {
             text = "▶  PLAY VIDEO"
             textSize = 14f
-            setTextColor(bg)
-            setBackgroundColor(cyan)
+            setTextColor(this@MainActivity.bg)
+            setBackgroundColor(this@MainActivity.cyan)
             setOnClickListener { playVideo() }
         }
 
@@ -134,8 +134,6 @@ class MainActivity : ComponentActivity() {
                 topMargin = 12
             }
         )
-
-        header.addView(status)
         videoContainer = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
         }
@@ -305,3 +303,5 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 }
+
+        header.addView(status)

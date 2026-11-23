@@ -1,5 +1,6 @@
 package com.hilax.play
 
+import android.app.DownloadManager
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.text.InputType
 import android.util.Patterns
 import android.view.Gravity
@@ -16,6 +18,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.webkit.URLUtil
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -42,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var urlInput: EditText
     private lateinit var fullscreenButton: Button
+    private lateinit var footer: LinearLayout
 
     private var isFullscreen = false
 
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
     private val panel = Color.rgb(19, 29, 45)
     private val cyan = Color.rgb(39, 215, 255)
     private val white = Color.WHITE
+    private val gold = Color.rgb(255, 200, 87)
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
@@ -63,6 +68,20 @@ class MainActivity : ComponentActivity() {
         setColor(color)
         cornerRadius = dp(radiusDp).toFloat()
     }
+
+    private fun outlined(
+        color: Int,
+        strokeColor: Int = Color.argb(70, 39, 215, 255),
+        radiusDp: Int = 12
+    ) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radiusDp).toFloat()
+        setStroke(dp(1), strokeColor)
+    }
+
+    private fun gradient(c1: Int, c2: Int, radiusDp: Int = 12) = GradientDrawable(
+        GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(c1, c2)
+    ).apply { cornerRadius = dp(radiusDp).toFloat() }
 
     // 16:9 player height in portrait, capped so the header is always visible
     private fun portraitVideoHeight(): Int {
@@ -123,7 +142,10 @@ class MainActivity : ComponentActivity() {
     private fun buildUI() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(bg)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.rgb(5, 9, 18), Color.rgb(12, 24, 46))
+            )
             setPadding(dp(16), dp(12), dp(16), dp(12))
         }
 
@@ -131,8 +153,10 @@ class MainActivity : ComponentActivity() {
 
         val title = TextView(this).apply {
             text = "HILAX PLAY"
-            textSize = 28f
+            textSize = 30f
+            letterSpacing = 0.18f
             setTextColor(cyan)
+            setShadowLayer(dp(10).toFloat(), 0f, 0f, Color.argb(160, 39, 215, 255))
             gravity = Gravity.CENTER
             setPadding(0, dp(8), 0, dp(2))
             typeface = Typeface.DEFAULT_BOLD
@@ -141,7 +165,8 @@ class MainActivity : ComponentActivity() {
         val subtitle = TextView(this).apply {
             text = "YOUR MOVIE EXPERIENCE"
             textSize = 11f
-            setTextColor(Color.LTGRAY)
+            letterSpacing = 0.3f
+            setTextColor(gold)
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, dp(16))
         }
@@ -162,7 +187,7 @@ class MainActivity : ComponentActivity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             imeOptions = EditorInfo.IME_ACTION_GO
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(panel)
+            background = outlined(Color.rgb(16, 26, 43))
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_GO) {
                     playVideo()
@@ -176,7 +201,7 @@ class MainActivity : ComponentActivity() {
             textSize = 12f
             isAllCaps = false
             setTextColor(white)
-            background = rounded(Color.rgb(30, 43, 60))
+            background = outlined(Color.rgb(24, 36, 56))
             setOnClickListener { pasteFromClipboard() }
         }
 
@@ -194,8 +219,19 @@ class MainActivity : ComponentActivity() {
             text = "▶  PLAY VIDEO"
             textSize = 14f
             setTextColor(this@MainActivity.bg)
-            background = rounded(this@MainActivity.cyan)
+            background = gradient(Color.rgb(39, 215, 255), Color.rgb(46, 125, 255))
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.08f
+            elevation = dp(6).toFloat()
             setOnClickListener { playVideo() }
+        }
+
+        val downloadButton = Button(this).apply {
+            text = "⬇  DOWNLOAD"
+            textSize = 14f
+            setTextColor(white)
+            background = outlined(Color.rgb(24, 36, 56), Color.argb(150, 255, 200, 87))
+            setOnClickListener { downloadVideo() }
         }
 
         status = TextView(this).apply {
@@ -215,9 +251,18 @@ class MainActivity : ComponentActivity() {
                 topMargin = dp(12)
             }
         )
+        header.addView(
+            downloadButton,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)).apply {
+                topMargin = dp(8)
+            }
+        )
         header.addView(status)
 
-        videoContainer = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        videoContainer = FrameLayout(this).apply {
+            background = rounded(Color.BLACK, 14)
+            clipToOutline = true
+        }
 
         playerView = PlayerView(this).apply {
             useController = true
@@ -265,6 +310,27 @@ class MainActivity : ComponentActivity() {
             )
         )
 
+        // Footer / credit, pinned to the bottom
+        footer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL or Gravity.BOTTOM
+            setPadding(0, 0, 0, dp(6))
+
+            addView(View(this@MainActivity).apply {
+                setBackgroundColor(Color.argb(60, 255, 200, 87))
+            }, LinearLayout.LayoutParams(dp(48), dp(1)).apply { bottomMargin = dp(8) })
+
+            addView(TextView(this@MainActivity).apply {
+                text = "Created by Mr_J_Jenu"
+                textSize = 12f
+                letterSpacing = 0.12f
+                setTextColor(gold)
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            })
+        }
+        root.addView(footer, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+
         setContentView(root)
     }
 
@@ -306,6 +372,49 @@ class MainActivity : ComponentActivity() {
 
         releasePlayer(saveState = false)
         initPlayer()
+    }
+
+    // ---------------------------------------------------------------- Download
+
+    /** Downloads a direct video file to the phone's Downloads/HILAX folder. */
+    private fun downloadVideo() {
+        val url = urlInput.text.toString().trim()
+
+        val validScheme = url.startsWith("https://", true) || url.startsWith("http://", true)
+        if (!validScheme || !Patterns.WEB_URL.matcher(url).matches()) {
+            status.text = "Please enter a valid http/https URL"
+            return
+        }
+
+        val lower = url.lowercase()
+        if (lower.contains(".m3u8") || lower.contains(".mpd") || lower.contains(".ism")) {
+            status.text = "Streaming links (HLS/DASH) can be played but not saved as one file."
+            return
+        }
+
+        hideKeyboard()
+
+        try {
+            var name = URLUtil.guessFileName(url, null, null)
+            if (!name.contains('.')) name = "hilax_video_${System.currentTimeMillis()}.mp4"
+
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle(name)
+                .setDescription("HILAX PLAY download")
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
+                .setAllowedOverMetered(true)
+                .setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS, "HILAX/$name"
+                )
+
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            status.text = "Download started: $name (see notification / Downloads/HILAX)"
+        } catch (e: Exception) {
+            status.text = "Download failed: ${e.message ?: "Unknown error"}"
+        }
     }
 
     private fun initPlayer() {
@@ -438,6 +547,8 @@ class MainActivity : ComponentActivity() {
 
         if (enable) {
             header.visibility = View.GONE
+            footer.visibility = View.GONE
+            videoContainer.background = rounded(Color.BLACK, 0)
             root.setPadding(0, 0, 0, 0)
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
@@ -450,6 +561,8 @@ class MainActivity : ComponentActivity() {
             fullscreenButton.text = "✕"
         } else {
             header.visibility = View.VISIBLE
+            footer.visibility = View.VISIBLE
+            videoContainer.background = rounded(Color.BLACK, 14)
             root.setPadding(dp(16), dp(12), dp(16), dp(12))
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
 
